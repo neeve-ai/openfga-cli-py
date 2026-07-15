@@ -1,9 +1,8 @@
 ---
 title: OpenFGA CLI Python Wrapper Package (openfga-cli-py)
-version: 1.0
+version: 1.2
 date_created: 2026-07-15
 last_updated: 2026-07-15
-version: 1.1
 owner: oss-robin (https://pypi.org/user/oss-robin/)
 tags: tool, infrastructure, process, python, packaging, openfga, cli
 ---
@@ -113,6 +112,7 @@ openfga-cli-py/
 ├── .pre-commit-hooks.yaml
 ├── LICENSE                   # Apache License Version 2.0
 ├── README.md
+├── Makefile                  # Developer workflow: install, quality (test + build wheel)
 ├── setup.cfg                 # Primary configuration (version, metadata, download specs)
 ├── setup.py                  # Minimal: bdist_wheel subclass only
 └── update_version.sh         # Script to regenerate setup.cfg for new releases
@@ -284,14 +284,15 @@ The workflow has three jobs that run in sequence on a version tag push, and only
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Job 1: build-and-test
-# Matrix: [ubuntu-latest, macos-latest, macos-latest (arm runner), windows-latest]
+# Matrix: [ubuntu-latest, macos-15-intel (x86_64), macos-latest (arm64), windows-latest]
 # Steps:
 #   - actions/checkout
 #   - actions/setup-python (python-version: "3.10")
+#   - pip install setuptools wheel setuptools-download   # Install build deps
 #   - pip install . --no-build-isolation
 #   - fga version
 #   - fga help
-#   - python setup.py bdist_wheel          # builds platform-tagged .whl
+#   - pip wheel --no-deps --no-build-isolation --wheel-dir dist .   # builds platform-tagged .whl
 #   - actions/upload-artifact              # name: wheels-<os>, path: dist/*.whl
 
 # Job 2: publish-pypi  (runs on: tag push only; needs: build-and-test)
