@@ -1,0 +1,5 @@
+- id: fga
+  name: fga
+  language: python
+  entry: fga
+  types: [file]
