@@ -77,7 +77,7 @@ This specification defines the requirements and implementation details for `open
 
 - **CON-001**: The package uses `setuptools-download`; it MUST NOT bundle the binary in the source tree or sdist.
 - **CON-002**: Windows assets use `.tar.gz` archives (same as Linux/macOS); the binary inside is named `fga.exe`.
-- **CON-003**: Python `>= 3.10` is required (matching shellcheck-py precedent and modern toolchain needs).
+- **CON-003**: Python `>= 3.11` is required (matching shellcheck-py precedent and modern toolchain needs).
 - **CON-004**: The wheel produced is NOT a pure-Python wheel (`root_is_pure = False` in `bdist_wheel`); it is tagged `py2.py3-none-<platform>`.
 - **CON-005**: PyPI rejects bare `linux_*` platform tags. Linux wheels MUST use the `manylinux` standard (minimum `manylinux_2_17`). The `_PYTHON_HOST_PLATFORM` environment variable MUST be set to `manylinux_2_17_x86_64` (or equivalent arch) before running `pip wheel`.
 - **CON-006**: The macOS `_PYTHON_HOST_PLATFORM` value MUST use dashes in the format `macosx-X.Y-arch` (e.g., `macosx-10.9-x86_64`). Using underscores causes `wheel.macosx_libfile.calculate_macosx_platform_tag` to crash with `ValueError: not enough values to unpack`.
@@ -142,7 +142,7 @@ classifiers =
     Programming Language :: Python :: Implementation :: PyPy
 
 [options]
-python_requires = >=3.10
+python_requires = >=3.11
 setup_requires =
     setuptools-download
 
@@ -308,7 +308,7 @@ The workflow has three jobs that run in sequence on a version tag push, and only
 #
 # Steps:
 #   - actions/checkout
-#   - actions/setup-python (python-version: "3.10", architecture: ${{ matrix.arch }})
+#   - actions/setup-python (python-version: "3.11", architecture: ${{ matrix.arch }})
 #       # arch is empty for Linux/macOS/WinARM — setup-python uses native arch
 #       # arch is 'x64' for windows-latest amd64, 'x86' for windows-latest 32-bit
 #   - pip install setuptools wheel setuptools-download
@@ -508,7 +508,7 @@ The version scheme `<upstream-version>.<packaging-revision>` (e.g., `0.7.19.0`) 
 - **DAT-001**: `checksums.txt` at each OpenFGA CLI release — SHA-256 hashes for all release assets; fetched by `update_version.sh`.
 
 ### Technology Platform Dependencies
-- **PLT-001**: Python >= 3.10 — Minimum runtime version.
+- **PLT-001**: Python >= 3.11 — Minimum runtime version.
 - **PLT-002**: `setuptools-download` — Required `setup_requires` plugin enabling binary download at install time.
 - **PLT-003**: `wheel` package — Required for building platform-tagged `.whl` distributions.
 
@@ -623,7 +623,7 @@ classifiers =
     Programming Language :: Python :: Implementation :: PyPy
 
 [options]
-python_requires = >=3.10
+python_requires = >=3.11
 setup_requires =
     setuptools-download
 

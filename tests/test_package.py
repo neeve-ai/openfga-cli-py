@@ -138,7 +138,7 @@ class TestCurrentSetupCfg:
 
     def test_python_requires_is_310(self):
         content = self.SETUP_CFG.read_text()
-        assert "python_requires = >=3.10" in content
+        assert "python_requires = >=3.11" in content
 
     def test_setup_requires_setuptools_download(self):
         content = self.SETUP_CFG.read_text()

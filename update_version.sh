@@ -64,7 +64,7 @@ classifiers =
     Programming Language :: Python :: Implementation :: PyPy
 
 [options]
-python_requires = >=3.10
+python_requires = >=3.11
 setup_requires =
     setuptools-download
 
