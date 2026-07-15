@@ -1,6 +1,6 @@
 ---
 title: OpenFGA CLI Python Wrapper Package (openfga-cli-py)
-version: 1.2
+version: 1.3
 date_created: 2026-07-15
 last_updated: 2026-07-15
 owner: oss-robin (https://pypi.org/user/oss-robin/)
@@ -77,15 +77,18 @@ This specification defines the requirements and implementation details for `open
 
 - **CON-001**: The package uses `setuptools-download`; it MUST NOT bundle the binary in the source tree or sdist.
 - **CON-002**: Windows assets use `.tar.gz` archives (same as Linux/macOS); the binary inside is named `fga.exe`.
-- **CON-003**: Python `>= 3.10` is required (matching shellcheck-py precedent and modern toolchain needs).
+- **CON-003**: Python `>= 3.11` is required (matching shellcheck-py precedent and modern toolchain needs).
 - **CON-004**: The wheel produced is NOT a pure-Python wheel (`root_is_pure = False` in `bdist_wheel`); it is tagged `py2.py3-none-<platform>`.
+- **CON-005**: PyPI rejects bare `linux_*` platform tags. Linux wheels MUST use the `manylinux` standard (minimum `manylinux_2_17`). The `_PYTHON_HOST_PLATFORM` environment variable MUST be set to `manylinux_2_17_x86_64` (or equivalent arch) before running `pip wheel`.
+- **CON-006**: The macOS `_PYTHON_HOST_PLATFORM` value MUST use dashes in the format `macosx-X.Y-arch` (e.g., `macosx-10.9-x86_64`). Using underscores causes `wheel.macosx_libfile.calculate_macosx_platform_tag` to crash with `ValueError: not enough values to unpack`.
 
 ### Guidelines
 
 - **GUD-001**: Follow the file and configuration layout of `shellcheck-py` exactly, substituting `shellcheck`→`fga`/`openfga_cli_py` and updating URLs/hashes accordingly.
-- **GUD-002**: Keep `setup.py` minimal — only the `bdist_wheel` subclass overriding `root_is_pure` and `get_tag()`.
+- **GUD-002**: Keep `setup.py` minimal — only the `bdist_wheel` subclass overriding `root_is_pure` and `get_tag()`. Import `bdist_wheel` from `setuptools.command.bdist_wheel` first (canonical since setuptools ≥ 70.1), fall back to `wheel.bdist_wheel`, and handle the case where both imports fail by setting `cmdclass = {}`.
 - **GUD-003**: Use `make quality` for local testing; it runs `fga version`, `fga help`, `pytest`, and builds the platform wheel.
 - **GUD-004**: Provide a `README.md` documenting installation, usage, and pre-commit hook integration.
+- **GUD-005**: Set `_PYTHON_HOST_PLATFORM` as an environment variable on the wheel-build step (not as a shell export) so it applies identically on Windows, macOS, and Linux runners.
 
 ### Patterns
 
@@ -139,7 +142,7 @@ classifiers =
     Programming Language :: Python :: Implementation :: PyPy
 
 [options]
-python_requires = >=3.10
+python_requires = >=3.11
 setup_requires =
     setuptools-download
 
@@ -210,9 +213,17 @@ download_scripts =
 from __future__ import annotations
 from setuptools import setup
 
+# setuptools >= 70.1 ships bdist_wheel natively; wheel package is the fallback
+# for older environments where setuptools delegated to the wheel package.
 try:
     from setuptools.command.bdist_wheel import bdist_wheel as orig_bdist_wheel
 except ImportError:
+    try:
+        from wheel.bdist_wheel import bdist_wheel as orig_bdist_wheel
+    except ImportError:
+        orig_bdist_wheel = None
+
+if orig_bdist_wheel is None:
     cmdclass = {}
 else:
     class bdist_wheel(orig_bdist_wheel):
@@ -229,6 +240,8 @@ else:
 
 setup(cmdclass=cmdclass)
 ```
+
+> **Rationale for import fallback chain**: `setuptools.command.bdist_wheel` is the canonical location since setuptools ≥ 70.1. In earlier versions setuptools delegated to the `wheel` package, so `wheel.bdist_wheel` is tried as a fallback. If both imports fail the wheel command is absent (`cmdclass = {}`), which would produce a `py3-none-any.whl` — this must be treated as a build error.
 
 ### 4.4 Platform Matrix (v0.7.19)
 
@@ -284,16 +297,34 @@ The workflow has three jobs that run in sequence on a version tag push, and only
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Job 1: build-and-test
-# Matrix: [ubuntu-latest, macos-15-intel (x86_64), macos-latest (arm64), windows-latest]
+# Matrix (include-style, 7 entries — one per wheel platform):
+#   - os: ubuntu-latest,    arch: '',   wheel-plat: manylinux_2_17_x86_64
+#   - os: ubuntu-24.04-arm, arch: '',   wheel-plat: manylinux_2_17_aarch64
+#   - os: macos-15-intel,   arch: '',   wheel-plat: macosx-10.9-x86_64     # dashes required
+#   - os: macos-latest,     arch: '',   wheel-plat: macosx-11.0-arm64       # dashes required
+#   - os: windows-latest,   arch: x64,  wheel-plat: win_amd64
+#   - os: windows-latest,   arch: x86,  wheel-plat: win32
+#   - os: windows-11-arm,   arch: '',   wheel-plat: win_arm64
+#
 # Steps:
 #   - actions/checkout
-#   - actions/setup-python (python-version: "3.10")
-#   - pip install setuptools wheel setuptools-download   # Install build deps
+#   - actions/setup-python (python-version: "3.11", architecture: ${{ matrix.arch }})
+#       # arch is empty for Linux/macOS/WinARM — setup-python uses native arch
+#       # arch is 'x64' for windows-latest amd64, 'x86' for windows-latest 32-bit
+#   - pip install setuptools wheel setuptools-download
 #   - pip install . --no-build-isolation
 #   - fga version
 #   - fga help
-#   - pip wheel --no-deps --no-build-isolation --wheel-dir dist .   # builds platform-tagged .whl
-#   - actions/upload-artifact              # name: wheels-<os>, path: dist/*.whl
+#   - pip wheel --no-deps --no-build-isolation --wheel-dir dist .
+#       env:
+#         _PYTHON_HOST_PLATFORM: ${{ matrix.wheel-plat }}
+#       # Forces the correct PyPI-accepted platform tag:
+#       #   Linux  → manylinux_2_17_*  (bare linux_* rejected by PyPI)
+#       #   macOS  → macosx-X.Y-arch   (use dashes; avoids runner-specific OS version)
+#       #   Windows→ win_amd64/win32/win_arm64
+#   - actions/upload-artifact
+#       name: wheels-${{ matrix.wheel-plat }}   # unique per entry; avoids collision
+#       path: dist/*.whl
 
 # Job 2: publish-pypi  (runs on: tag push only; needs: build-and-test)
 # Steps:
@@ -319,14 +350,31 @@ The workflow has three jobs that run in sequence on a version tag push, and only
 
 **Key constraint**: Jobs 2 and 3 both depend on `build-and-test` completing successfully across all matrix legs before any publishing begins. They run in parallel once the build job completes.
 
-**Artifact naming convention**: Each build matrix leg uploads its wheel with a unique artifact name (e.g., `wheels-ubuntu-latest`, `wheels-macos-latest`, `wheels-windows-latest`) to avoid collisions. The publish jobs download all artifacts and merge them into a single `dist/` directory before uploading.
+**Artifact naming convention**: Each build matrix leg uploads its wheel with `wheels-${{ matrix.wheel-plat }}` (e.g., `wheels-manylinux_2_17_x86_64`, `wheels-win32`). Using `wheel-plat` rather than `os` ensures the two `windows-latest` entries (amd64 and x86) produce distinct artifact names and do not overwrite each other.
 
-**GitHub Release asset naming**: Wheels follow the standard filename pattern already set by `bdist_wheel`:
+**`_PYTHON_HOST_PLATFORM` values by entry**:
+
+| Runner | `arch` | `wheel-plat` (= `_PYTHON_HOST_PLATFORM`) | Produced filename tag |
+|--------|--------|-------------------------------------------|-----------------------|
+| `ubuntu-latest` | — | `manylinux_2_17_x86_64` | `manylinux_2_17_x86_64` |
+| `ubuntu-24.04-arm` | — | `manylinux_2_17_aarch64` | `manylinux_2_17_aarch64` |
+| `macos-15-intel` | — | `macosx-10.9-x86_64` | `macosx_10_9_x86_64` |
+| `macos-latest` (arm64) | — | `macosx-11.0-arm64` | `macosx_11_0_arm64` |
+| `windows-latest` | `x64` | `win_amd64` | `win_amd64` |
+| `windows-latest` | `x86` | `win32` | `win32` |
+| `windows-11-arm` | — | `win_arm64` | `win_arm64` |
+
+> **Note**: macOS `_PYTHON_HOST_PLATFORM` uses dashes (`macosx-10.9-x86_64`). The `wheel` library's `macosx_libfile.py` splits this value on `-` to extract the OS version and architecture; underscores cause a `ValueError`.
+
+**GitHub Release asset naming**: Wheels follow the standard filename pattern set by `bdist_wheel`:
 ```
-openfga_cli_py-0.7.19.0-py2.py3-none-linux_x86_64.whl
-openfga_cli_py-0.7.19.0-py2.py3-none-macosx_14_0_arm64.whl
+openfga_cli_py-0.7.19.0-py2.py3-none-manylinux_2_17_x86_64.whl
+openfga_cli_py-0.7.19.0-py2.py3-none-manylinux_2_17_aarch64.whl
+openfga_cli_py-0.7.19.0-py2.py3-none-macosx_10_9_x86_64.whl
+openfga_cli_py-0.7.19.0-py2.py3-none-macosx_11_0_arm64.whl
 openfga_cli_py-0.7.19.0-py2.py3-none-win_amd64.whl
-# ... one file per platform/arch combination built in the matrix
+openfga_cli_py-0.7.19.0-py2.py3-none-win32.whl
+openfga_cli_py-0.7.19.0-py2.py3-none-win_arm64.whl
 ```
 
 #### Pre-commit hooks (`.pre-commit-hooks.yaml`)
@@ -403,12 +451,17 @@ The hook invokes `fga` directly. Pass any `fga` subcommands and flags via `args`
 - **AC-004**: Given any supported platform, when the downloaded archive SHA-256 does not match the value in `setup.cfg`, then installation MUST fail with a checksum error.
 - **AC-005**: Given `./update_version.sh 0.7.20` is run, when v0.7.20 exists on GitHub releases, then `setup.cfg` is updated with the new version `0.7.20.0` and correct SHA-256 hashes for all 8 platforms.
 - **AC-006**: Given `./update_version.sh` is run without arguments, then the script exits with code `1` and prints usage instructions.
-- **AC-007**: Given a git tag `v0.7.19.0` is pushed, when the GitHub Actions `main.yml` workflow completes, then platform-tagged wheels are published to PyPI under the `oss-robin` account.
+- **AC-007**: Given a git tag `v0.7.19.0` is pushed, when the GitHub Actions `main.yml` workflow completes, then 7 platform-tagged wheels (manylinux x86_64, manylinux aarch64, macosx x86_64, macosx arm64, win_amd64, win32, win_arm64) are published to PyPI under the `oss-robin` account.
 - **AC-008**: Given the package is installed, when `python -c "import subprocess; subprocess.run(['fga', 'version'], check=True)"` is executed, then it succeeds without error.
-- **AC-009**: Given a git tag `v0.7.19.0` is pushed, when the `publish-github-release` job completes, then the GitHub Release for that tag contains at least one `.whl` asset per supported platform (linux_x86_64, linux_aarch64, macosx arm64, macosx amd64, win_amd64) downloadable via the GitHub Releases API.
+- **AC-009**: Given a git tag `v0.7.19.0` is pushed, when the `publish-github-release` job completes, then the GitHub Release for that tag contains 7 `.whl` assets (one per platform: manylinux_2_17_x86_64, manylinux_2_17_aarch64, macosx_10_9_x86_64, macosx_11_0_arm64, win_amd64, win32, win_arm64) downloadable via the GitHub Releases API.
 - **AC-010**: Given a `.pre-commit-config.yaml` referencing `repo: https://github.com/<owner>/openfga-cli-py` at `rev: v0.7.19.0` with `id: fga`, when `pre-commit install && pre-commit run fga --all-files` is executed, then the hook runs `fga` successfully and exits with code `0`.
 - **AC-011**: Given a `.pre-commit-config.yaml` with the `fga` hook and `args: [model, validate, --file, openfga.json]`, when the hook runs against a valid `openfga.json` model file, then it exits with code `0`; when run against an invalid model file, it exits with a non-zero code.
 - **AC-012**: Given the GitHub Release for `v0.7.19.0` exists with wheel assets, when a wheel is installed directly with `pip install <wheel-url>`, then `fga version` succeeds without downloading from PyPI.
+- **AC-013**: Given a Linux aarch64 environment, when `pip install openfga-cli-py` is run, then the `fga` binary for ARM64 is available in `PATH` and `fga version` succeeds.
+- **AC-014**: Given a Windows x86 environment (32-bit Python), when `pip install openfga-cli-py` is run, then the 32-bit `fga.exe` is available in the `Scripts/` directory and `fga version` succeeds.
+- **AC-015**: Given a Windows ARM64 environment, when `pip install openfga-cli-py` is run, then the ARM64 `fga.exe` is available in the `Scripts/` directory and `fga version` succeeds.
+- **AC-016**: Given `pip wheel --no-deps --no-build-isolation --wheel-dir dist .` is run on an Ubuntu runner WITHOUT `_PYTHON_HOST_PLATFORM` set, then the produced wheel is named `*-linux_x86_64.whl`; PyPI MUST reject this wheel with HTTP 400. With `_PYTHON_HOST_PLATFORM=manylinux_2_17_x86_64` set, the produced wheel is named `*-manylinux_2_17_x86_64.whl` and PyPI MUST accept it.
+- **AC-017**: Given `setup.py` is imported in an environment where both `setuptools.command.bdist_wheel` and `wheel.bdist_wheel` are unavailable, then `cmdclass` is `{}` and a warning or build error is raised — a `py3-none-any.whl` MUST NOT be published to PyPI.
 
 ---
 
@@ -419,7 +472,7 @@ The hook invokes `fga` directly. Pass any `fga` subcommands and flags via `args`
   - *Integration*: Full install on each platform via GitHub Actions matrix.
 - **Frameworks**: `make` (quality target), `pip` (installation), `pytest` (tests), native shell for binary invocation.
 - **Test Data Management**: No external test data required; tests rely solely on the installed binary.
-- **CI/CD Integration**: GitHub Actions `main.yml` runs on every push/PR; on tag push it runs three jobs: build-and-test → publish-pypi (parallel with) publish-github-release.
+- **CI/CD Integration**: GitHub Actions `main.yml` runs on every push/PR; on tag push it runs three jobs: build-and-test (7-platform matrix: manylinux x86_64, manylinux aarch64, macOS Intel, macOS arm64, Windows amd64, Windows x86, Windows arm64) → publish-pypi (parallel with) publish-github-release.
 - **Coverage Requirements**: N/A — the package wraps a pre-built binary with no Python logic to measure.
 - **Performance Testing**: Not required; binary download time is acceptable at install time only.
 
@@ -455,7 +508,7 @@ The version scheme `<upstream-version>.<packaging-revision>` (e.g., `0.7.19.0`) 
 - **DAT-001**: `checksums.txt` at each OpenFGA CLI release — SHA-256 hashes for all release assets; fetched by `update_version.sh`.
 
 ### Technology Platform Dependencies
-- **PLT-001**: Python >= 3.10 — Minimum runtime version.
+- **PLT-001**: Python >= 3.11 — Minimum runtime version.
 - **PLT-002**: `setuptools-download` — Required `setup_requires` plugin enabling binary download at install time.
 - **PLT-003**: `wheel` package — Required for building platform-tagged `.whl` distributions.
 
@@ -559,7 +612,7 @@ version = ${VERSION}.0
 description = Python wrapper around invoking the OpenFGA CLI (https://github.com/openfga/cli)
 long_description = file: README.md
 long_description_content_type = text/markdown
-url = https://github.com/openfga/openfga-cli-py
+url = https://github.com/neeve-ai/openfga-cli-py
 author = oss-robin
 license = Apache License Version 2.0
 license_files = LICENSE
@@ -570,7 +623,7 @@ classifiers =
     Programming Language :: Python :: Implementation :: PyPy
 
 [options]
-python_requires = >=3.10
+python_requires = >=3.11
 setup_requires =
     setuptools-download
 
@@ -650,11 +703,12 @@ echo "Updated SHA-256 hashes for 8 platforms."
 5. `./update_version.sh 0.7.20` produces a `setup.cfg` with `version = 0.7.20.0` and all 8 SHA-256 values matching the official `checksums.txt` for v0.7.20.
 6. `./update_version.sh` (no args) exits with code `1`.
 7. `./update_version.sh invalid-ver` exits with code `1`.
-8. The GitHub Actions workflow successfully publishes to PyPI on tag push (verified by `pip install openfga-cli-py==0.7.19.0` resolving).
-9. The produced wheel filename follows the pattern `openfga_cli_py-0.7.19.0-py2.py3-none-<platform_tag>.whl`.
-10. The GitHub Release for tag `v0.7.19.0` contains `.whl` assets (verified via `gh release view v0.7.19.0 --repo <owner>/openfga-cli-py --json assets`); at minimum one wheel per OS family (linux, darwin, windows) is present.
+8. The GitHub Actions workflow successfully publishes to PyPI on tag push (verified by `pip install openfga-cli-py==0.7.19.0` resolving). PyPI upload MUST NOT receive any HTTP 400 error (which would indicate an unsupported platform tag such as bare `linux_x86_64`).
+9. The produced wheel filenames follow the pattern `openfga_cli_py-0.7.19.0-py2.py3-none-<platform_tag>.whl` for each of the 7 supported platform tags: `manylinux_2_17_x86_64`, `manylinux_2_17_aarch64`, `macosx_10_9_x86_64`, `macosx_11_0_arm64`, `win_amd64`, `win32`, `win_arm64`. No `py3-none-any.whl` is present in the release.
+10. The GitHub Release for tag `v0.7.19.0` contains exactly 7 `.whl` assets (verified via `gh release view v0.7.19.0 --repo <owner>/openfga-cli-py --json assets`).
 11. `pip install <github-release-wheel-url>` installs the package and `fga version` succeeds without contacting PyPI.
 12. `pre-commit run fga --all-files` succeeds in a repository that has `.pre-commit-config.yaml` referencing this package at `rev: v0.7.19.0`.
+13. A `py3-none-any.whl` wheel MUST NOT appear in the `dist/` directory or GitHub Release assets. Its presence indicates that the `bdist_wheel` custom class was not loaded (import failure) and the build is invalid.
 
 ---
 

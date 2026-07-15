@@ -53,7 +53,7 @@ version = ${VERSION}.0
 description = Python wrapper around invoking the OpenFGA CLI (https://github.com/openfga/cli)
 long_description = file: README.md
 long_description_content_type = text/markdown
-url = https://github.com/openfga/openfga-cli-py
+url = https://github.com/neeve-ai/openfga-cli-py
 author = oss-robin
 license = Apache License Version 2.0
 license_files = LICENSE
@@ -64,7 +64,7 @@ classifiers =
     Programming Language :: Python :: Implementation :: PyPy
 
 [options]
-python_requires = >=3.10
+python_requires = >=3.11
 setup_requires =
     setuptools-download
 

@@ -2,7 +2,7 @@
 
 A Python wrapper to provide a pip-installable [OpenFGA CLI (`fga`)](https://github.com/openfga/cli) binary.
 
-[![CI](https://github.com/openfga/openfga-cli-py/actions/workflows/main.yml/badge.svg)](https://github.com/openfga/openfga-cli-py/actions/workflows/main.yml)
+[![CI](https://github.com/neeve-ai/openfga-cli-py/actions/workflows/main.yml/badge.svg)](https://github.com/neeve-ai/openfga-cli-py/actions/workflows/main.yml)
 [![PyPI](https://img.shields.io/pypi/v/openfga-cli-py)](https://pypi.org/project/openfga-cli-py/)
 
 ## Installation
@@ -14,7 +14,7 @@ pip install openfga-cli-py
 Or install a platform wheel directly from a GitHub Release (for air-gapped/offline use):
 
 ```bash
-pip install https://github.com/openfga/openfga-cli-py/releases/download/v0.7.19.0/openfga_cli_py-0.7.19.0-py2.py3-none-linux_x86_64.whl
+pip install https://github.com/neeve-ai/openfga-cli-py/releases/download/v0.7.19.0/openfga_cli_py-0.7.19.0-py2.py3-none-linux_x86_64.whl
 ```
 
 ## Usage
@@ -45,7 +45,7 @@ subprocess.run(["fga", "version"], check=True)
 > `setuptools-download`. Use a supported platform or build from source.
 
 > **Note**: In air-gapped environments, download the pre-built wheel for your platform from
-> the [GitHub Releases page](https://github.com/openfga/openfga-cli-py/releases) and install
+> the [GitHub Releases page](https://github.com/neeve-ai/openfga-cli-py/releases) and install
 > it directly with `pip install <wheel-file>`.
 
 ## As a pre-commit hook
@@ -53,7 +53,7 @@ subprocess.run(["fga", "version"], check=True)
 Add to your `.pre-commit-config.yaml`:
 
 ```yaml
-- repo: https://github.com/openfga/openfga-cli-py
+- repo: https://github.com/neeve-ai/openfga-cli-py
   rev: v0.7.19.0
   hooks:
     - id: fga

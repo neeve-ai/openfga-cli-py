@@ -2,9 +2,17 @@ from __future__ import annotations
 
 from setuptools import setup
 
+# setuptools >= 70.1 ships bdist_wheel natively; wheel package is the fallback
+# for older environments where setuptools delegated to the wheel package.
 try:
     from setuptools.command.bdist_wheel import bdist_wheel as orig_bdist_wheel
 except ImportError:
+    try:
+        from wheel.bdist_wheel import bdist_wheel as orig_bdist_wheel
+    except ImportError:
+        orig_bdist_wheel = None
+
+if orig_bdist_wheel is None:
     cmdclass = {}
 else:
     class bdist_wheel(orig_bdist_wheel):
