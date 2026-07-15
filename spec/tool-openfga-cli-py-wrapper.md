@@ -61,7 +61,7 @@ This specification defines the requirements and implementation details for `open
 - **REQ-003**: Each downloaded archive MUST be verified against its SHA-256 checksum before extraction.
 - **REQ-004**: The package version MUST follow the scheme `<openfga-cli-version>.<packaging-revision>` (e.g., `0.7.19.0`).
 - **REQ-005**: A shell script (`update_version.sh`) MUST be provided to regenerate `setup.cfg` for a new OpenFGA CLI release.
-- **REQ-006**: The package MUST be publishable to PyPI under the `oss-robin` account using Trusted Publisher (OIDC) or API token authentication.
+- **REQ-006**: The package MUST be publishable to PyPI under the `oss-robin` account using a PyPI API token stored as a GitHub Actions secret (`PYPI_API_TOKEN`) and the `pypa/gh-action-pypi-publish@release/v1` action.
 - **REQ-007**: Platform-tagged wheels MUST be built and uploaded so that `pip install` does not need to recompile anything.
 - **REQ-008**: The package MUST expose a `fga` console script entry point (or binary via `setuptools-download`) after installation.
 - **REQ-009**: All platform-tagged `.whl` files produced during a release MUST be uploaded as GitHub Release assets on the corresponding tag, in addition to being published to PyPI.
@@ -70,7 +70,7 @@ This specification defines the requirements and implementation details for `open
 ### Security Requirements
 
 - **SEC-001**: Downloaded binaries MUST be verified via SHA-256 checksums sourced from the official `checksums.txt` at the OpenFGA CLI release page.
-- **SEC-002**: The PyPI publish workflow MUST use short-lived OIDC tokens (Trusted Publisher) rather than long-lived API tokens where possible.
+- **SEC-002**: The PyPI publish workflow MUST authenticate using a scoped PyPI API token (scoped to the `openfga-cli-py` project) stored as the GitHub Actions secret `PYPI_API_TOKEN`. The token MUST NOT be printed in logs.
 - **SEC-003**: GitHub Actions workflow steps MUST pin third-party actions to a specific commit SHA or version tag.
 - **SEC-004**: The GitHub Release asset upload step MUST use the `GITHUB_TOKEN` provided by the Actions runtime (no additional secrets required for asset uploads).
 
@@ -281,7 +281,7 @@ The workflow has three jobs that run in sequence on a version tag push, and only
 #
 # Permissions (top-level, tightened per-job as needed):
 #   contents: write       # required for GitHub Release asset upload
-#   id-token: write       # required for OIDC PyPI Trusted Publisher
+#   id-token: write       # NOT required (no OIDC); contents: write covers release uploads
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Job 1: build-and-test
@@ -297,11 +297,12 @@ The workflow has three jobs that run in sequence on a version tag push, and only
 
 # Job 2: publish-pypi  (runs on: tag push only; needs: build-and-test)
 # Steps:
-#   - actions/download-artifact            # downloads all wheels-* artifacts
-#   - pypa/gh-action-pypi-publish          # uploads all .whl files to PyPI
+#   - actions/download-artifact            # downloads all wheels-* artifacts into dist/
+#   - pypa/gh-action-pypi-publish@release/v1
 #     with:
 #       packages-dir: dist/
-#       # Uses Trusted Publisher (OIDC) — no API token secret required
+#       password: ${{ secrets.PYPI_API_TOKEN }}
+#       # PYPI_API_TOKEN must be a project-scoped PyPI API token stored in repo secrets
 
 # Job 3: publish-github-release  (runs on: tag push only; needs: build-and-test)
 # Steps:
@@ -447,7 +448,7 @@ The version scheme `<upstream-version>.<packaging-revision>` (e.g., `0.7.19.0`) 
 - **SVC-002**: GitHub Actions — CI/CD runtime for building wheels and publishing to PyPI.
 
 ### Infrastructure Dependencies
-- **INF-001**: GitHub Trusted Publisher (OIDC) — For secretless PyPI publishing from GitHub Actions.
+- **INF-001**: PyPI API token (`PYPI_API_TOKEN`) — A project-scoped PyPI API token for the `openfga-cli-py` project under the `oss-robin` account, stored as a GitHub Actions repository secret. Used by `pypa/gh-action-pypi-publish@release/v1`.
 - **INF-002**: GitHub Release API (`GITHUB_TOKEN`) — For uploading `.whl` assets to the GitHub Release associated with the version tag. No additional secrets required; the default `GITHUB_TOKEN` with `contents: write` permission is sufficient.
 
 ### Data Dependencies
@@ -663,6 +664,6 @@ echo "Updated SHA-256 hashes for 8 platforms."
 - [setuptools-download documentation](https://github.com/asottile/setuptools-download) — Plugin used for binary downloads.
 - [OpenFGA CLI releases](https://github.com/openfga/cli/releases) — Upstream binary source.
 - [OpenFGA CLI v0.7.19 release](https://github.com/openfga/cli/releases/tag/v0.7.19) — Specific version this spec targets.
-- [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) — Recommended OIDC-based publish mechanism.
+- [pypa/gh-action-pypi-publish](https://github.com/pypa/gh-action-pypi-publish) — GitHub Action used to publish wheels to PyPI via API token (`@release/v1`).
 - [PEP 508 — Environment Markers](https://peps.python.org/pep-0508/) — Syntax for `marker =` entries in `setup.cfg`.
 - [PyPI user oss-robin](https://pypi.org/user/oss-robin/) — Target PyPI account for publishing.
