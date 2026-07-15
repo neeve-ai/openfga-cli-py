@@ -58,6 +58,8 @@ Add to your `.pre-commit-config.yaml`:
   hooks:
     - id: fga
       args: [model, validate, --file, openfga.json]
+      pass_filenames: false
+      always_run: true
 ```
 
 The hook invokes `fga` directly. Pass any `fga` subcommands and flags via `args`.
