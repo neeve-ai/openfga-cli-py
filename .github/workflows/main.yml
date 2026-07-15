@@ -14,16 +14,42 @@ permissions:
 
 jobs:
   build-and-test:
-    name: build-and-test (${{ matrix.os }})
+    name: build-and-test (${{ matrix.wheel-plat }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-15-intel  # x86_64
-          - macos-latest    # arm64 (macos-14+)
-          - windows-latest
+        include:
+          # Linux x86_64 — manylinux_2_17 tag required by PyPI (bare linux_x86_64 is rejected)
+          - os: ubuntu-latest
+            arch: ''
+            wheel-plat: manylinux_2_17_x86_64
+          # Linux aarch64
+          - os: ubuntu-24.04-arm
+            arch: ''
+            wheel-plat: manylinux_2_17_aarch64
+          # macOS Intel x86_64 — use 10.9 deployment target for broad compatibility
+          # NOTE: macOS _PYTHON_HOST_PLATFORM must use dashes (macosx-X.Y-arch),
+          # not underscores — wheel's macosx_libfile.py splits on '-'
+          - os: macos-15-intel
+            arch: ''
+            wheel-plat: macosx-10.9-x86_64
+          # macOS Apple Silicon arm64 — 11.0 is the minimum for arm64
+          - os: macos-latest
+            arch: ''
+            wheel-plat: macosx-11.0-arm64
+          # Windows 64-bit
+          - os: windows-latest
+            arch: x64
+            wheel-plat: win_amd64
+          # Windows 32-bit — 32-bit Python on 64-bit runner via actions/setup-python arch
+          - os: windows-latest
+            arch: x86
+            wheel-plat: win32
+          # Windows ARM64 — native runner; no arch override, setup-python defaults to ARM64
+          - os: windows-11-arm
+            arch: ''
+            wheel-plat: win_arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +57,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          architecture: ${{ matrix.arch }}
 
       - name: Install build deps
         run: pip install setuptools wheel setuptools-download
@@ -45,11 +72,18 @@ jobs:
         run: fga help
 
       - name: Build platform wheel
+        env:
+          # Force the correct platform tag; without this:
+          #   - Linux gets bare linux_x86_64 which PyPI rejects (needs manylinux)
+          #   - macOS gets the runner OS version (too new, e.g. macosx_15_0)
+          #   - Windows x86 Python may not detect win32 correctly
+          _PYTHON_HOST_PLATFORM: ${{ matrix.wheel-plat }}
         run: pip wheel --no-deps --no-build-isolation --wheel-dir dist .
 
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}
+          # Use wheel-plat in the name — ensures uniqueness across the two windows-latest entries
+          name: wheels-${{ matrix.wheel-plat }}
           path: dist/*.whl
 
   publish-pypi:
