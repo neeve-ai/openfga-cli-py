@@ -85,7 +85,7 @@ This specification defines the requirements and implementation details for `open
 
 - **GUD-001**: Follow the file and configuration layout of `shellcheck-py` exactly, substituting `shellcheck`→`fga`/`openfga_cli_py` and updating URLs/hashes accordingly.
 - **GUD-002**: Keep `setup.py` minimal — only the `bdist_wheel` subclass overriding `root_is_pure` and `get_tag()`.
-- **GUD-003**: Use `tox` for local testing; the `tox.ini` test command should run `fga version` and `fga help`.
+- **GUD-003**: Use `make quality` for local testing; it runs `fga version`, `fga help`, `pytest`, and builds the platform wheel.
 - **GUD-004**: Provide a `README.md` documenting installation, usage, and pre-commit hook integration.
 
 ### Patterns
@@ -115,7 +115,6 @@ openfga-cli-py/
 ├── README.md
 ├── setup.cfg                 # Primary configuration (version, metadata, download specs)
 ├── setup.py                  # Minimal: bdist_wheel subclass only
-├── tox.ini
 └── update_version.sh         # Script to regenerate setup.cfg for new releases
 ```
 
@@ -341,21 +340,21 @@ openfga_cli_py-0.7.19.0-py2.py3-none-win_amd64.whl
   # Or install directly from the GitHub Release wheel asset if offline use is needed
 ```
 
-### 4.7 `tox.ini`
+### 4.7 `Makefile`
 
-```ini
-[tox]
-envlist = py,pre-commit
+```makefile
+.PHONY: install quality
 
-[testenv]
-commands =
-    fga version
-    fga help
+install:
+	pip install setuptools wheel setuptools-download
+	pip install . --no-build-isolation
 
-[testenv:pre-commit]
-skip_install = true
-deps = pre-commit
-commands = pre-commit run --all-files --show-diff-on-failure
+quality: install
+	fga version
+	fga help
+	pip install --quiet pytest
+	pytest tests/
+	pip wheel --no-deps --no-build-isolation --wheel-dir dist .
 ```
 
 ### 4.8 `README.md` Content Outline
@@ -417,7 +416,7 @@ The hook invokes `fga` directly. Pass any `fga` subcommands and flags via `args`
 - **Test Levels**:
   - *Smoke*: `fga version` and `fga help` run successfully post-install.
   - *Integration*: Full install on each platform via GitHub Actions matrix.
-- **Frameworks**: `tox` (environment management), `pip` (installation), native shell for binary invocation.
+- **Frameworks**: `make` (quality target), `pip` (installation), `pytest` (tests), native shell for binary invocation.
 - **Test Data Management**: No external test data required; tests rely solely on the installed binary.
 - **CI/CD Integration**: GitHub Actions `main.yml` runs on every push/PR; on tag push it runs three jobs: build-and-test → publish-pypi (parallel with) publish-github-release.
 - **Coverage Requirements**: N/A — the package wraps a pre-built binary with no Python logic to measure.

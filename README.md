@@ -77,9 +77,8 @@ with updated URLs and SHA-256 hashes for all 8 platforms.
 ## Development
 
 ```bash
-pip install tox
-tox          # runs: fga version && fga help
-tox -e pre-commit  # runs pre-commit hooks
+make install   # installs the package and dependencies
+make quality   # runs: fga version && fga help, pytest, and builds platform wheel
 ```
 
 ## License
