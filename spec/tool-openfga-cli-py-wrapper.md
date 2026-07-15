@@ -111,7 +111,7 @@ openfga-cli-py/
 ├── .gitignore
 ├── .pre-commit-config.yaml
 ├── .pre-commit-hooks.yaml
-├── LICENSE                   # MIT
+├── LICENSE                   # Apache License Version 2.0
 ├── README.md
 ├── setup.cfg                 # Primary configuration (version, metadata, download specs)
 ├── setup.py                  # Minimal: bdist_wheel subclass only
@@ -131,7 +131,7 @@ long_description_content_type = text/markdown
 url = https://github.com/<owner>/openfga-cli-py
 author = oss-robin
 author_email = <maintainer-email>
-license = MIT
+license = Apache License Version 2.0
 license_files = LICENSE
 classifiers =
     Programming Language :: Python :: 3
@@ -460,7 +460,7 @@ The version scheme `<upstream-version>.<packaging-revision>` (e.g., `0.7.19.0`) 
 - **PLT-003**: `wheel` package — Required for building platform-tagged `.whl` distributions.
 
 ### Compliance Dependencies
-- **COM-001**: MIT License — The wrapper package must be MIT-licensed, consistent with the OpenFGA CLI license.
+- **COM-001**: Apache License Version 2.0 License — The wrapper package must be Apache License Version 2.0-licensed, consistent with the OpenFGA CLI license.
 
 ---
 
@@ -561,7 +561,7 @@ long_description = file: README.md
 long_description_content_type = text/markdown
 url = https://github.com/openfga/openfga-cli-py
 author = oss-robin
-license = MIT
+license = Apache License Version 2.0
 license_files = LICENSE
 classifiers =
     Programming Language :: Python :: 3
