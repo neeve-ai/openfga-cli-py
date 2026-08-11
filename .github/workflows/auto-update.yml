@@ -1,0 +1,73 @@
+name: Auto-Update Upstream
+
+on:
+  schedule:
+    # Run every day at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allows you to manually trigger the workflow from the Actions tab
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Use the PAT so that pushing the commit/tag can trigger main.yml
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Check for new upstream release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Fetch the latest tag from the official openfga/cli repo
+          LATEST_TAG=$(gh api repos/openfga/cli/releases/latest --jq .tag_name)
+          # Strip the 'v' prefix (e.g., v0.7.20 -> 0.7.20)
+          LATEST_VERSION=${LATEST_TAG#v}
+
+          # Read the current version from setup.cfg
+          CURRENT_VERSION=$(grep "^version = " setup.cfg | awk '{print $3}')
+
+          # Packaging version scheme appends .0 to the upstream version (e.g., 0.7.20.0)
+          EXPECTED_CURRENT="${LATEST_VERSION}.0"
+
+          if [ "$CURRENT_VERSION" == "$EXPECTED_CURRENT" ]; then
+            echo "Version is already up to date ($CURRENT_VERSION)."
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+          else
+            echo "New version found: $LATEST_VERSION (Current: $CURRENT_VERSION)"
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+            echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run update script
+        if: steps.check.outputs.update_needed == 'true'
+        run: |
+          ./update_version.sh ${{ steps.check.outputs.latest_version }}
+
+      - name: Commit, Push, and Release
+        if: steps.check.outputs.update_needed == 'true'
+        env:
+          # PAT is required here to create the release and trigger main.yml
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          LATEST_VERSION=${{ steps.check.outputs.latest_version }}
+          NEW_TAG="v${LATEST_VERSION}.0"
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Commit the changes made by update_version.sh
+          git add setup.cfg README.md tests/test_openfga_cli.py
+          git commit -m "Auto-update openfga-cli to ${LATEST_VERSION}"
+          git push origin main
+
+          # Create a new GitHub Release.
+          # Creating this release automatically generates the tag,
+          # which will trigger the `main.yml` CI workflow.
+          gh release create "$NEW_TAG" \
+            --title "$NEW_TAG" \
+            --notes "Automated release updating upstream openfga-cli to $LATEST_VERSION"

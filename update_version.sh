@@ -16,6 +16,19 @@ if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Capture old version from setup.cfg before any writes
+OLD_VERSION=$(grep "^version = " "${SCRIPT_DIR}/setup.cfg" | awk '{print $3}')
+if [[ -z "$OLD_VERSION" ]]; then
+    echo "Error: Could not read current version from setup.cfg" >&2
+    exit 1
+fi
+
+NEW_VERSION="${VERSION}.0"
+
+echo "Updating ${OLD_VERSION} → ${NEW_VERSION}"
+
 RELEASE_BASE="https://github.com/openfga/cli/releases/download/v${VERSION}"
 CHECKSUMS_URL="${RELEASE_BASE}/checksums.txt"
 
@@ -130,3 +143,24 @@ EOF
 
 echo "setup.cfg updated to version ${VERSION}.0"
 echo "Updated SHA-256 hashes for 8 platforms."
+
+# Update tests/test_openfga_cli.py
+TEST_FILE="${SCRIPT_DIR}/tests/test_openfga_cli.py"
+OLD_VERSION_RE=${OLD_VERSION//./\\.}
+sed -i.bak \
+    -e "s/version = ${OLD_VERSION_RE}/version = ${NEW_VERSION}/g" \
+    -e "s/fga_${OLD_VERSION_RE%\.0}_/fga_${VERSION}_/g" \
+    -e "s/\"${OLD_VERSION_RE%\.0}\" in output/\"${VERSION}\" in output/g" \
+    -e "s/v${OLD_VERSION_RE%\.0}'/v${VERSION}'/g" \
+    "${TEST_FILE}"
+rm -f "${TEST_FILE}.bak"
+echo "tests/test_openfga_cli.py updated (${OLD_VERSION} → ${NEW_VERSION})"
+
+# Update README.md
+README_FILE="${SCRIPT_DIR}/README.md"
+sed -i.bak \
+    -e "s/v${OLD_VERSION_RE}/v${NEW_VERSION}/g" \
+    -e "s/openfga_cli_py-${OLD_VERSION_RE}/openfga_cli_py-${NEW_VERSION}/g" \
+    "${README_FILE}"
+rm -f "${README_FILE}.bak"
+echo "README.md updated (v${OLD_VERSION} → v${NEW_VERSION})"
