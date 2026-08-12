@@ -61,7 +61,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Commit the changes made by update_version.sh
-          git add setup.cfg README.md tests/test_openfga_cli.py
+          git add setup.cfg README.md tests/test_package.py
           git commit -m "Auto-update openfga-cli to ${LATEST_VERSION}"
           git push origin main
 
