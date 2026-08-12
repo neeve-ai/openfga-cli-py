@@ -88,19 +88,19 @@ class TestCurrentSetupCfg:
 
     def test_version_is_correct(self):
         content = self.SETUP_CFG.read_text()
-        assert "version = 0.7.19.0" in content
+        assert "version = 0.7.20.0" in content
 
     def test_all_8_platforms_present(self):
         content = self.SETUP_CFG.read_text()
         expected_archives = [
-            "fga_0.7.19_linux_amd64.tar.gz",
-            "fga_0.7.19_linux_arm64.tar.gz",
-            "fga_0.7.19_linux_386.tar.gz",
-            "fga_0.7.19_darwin_amd64.tar.gz",
-            "fga_0.7.19_darwin_arm64.tar.gz",
-            "fga_0.7.19_windows_amd64.tar.gz",
-            "fga_0.7.19_windows_arm64.tar.gz",
-            "fga_0.7.19_windows_386.tar.gz",
+            "fga_0.7.20_linux_amd64.tar.gz",
+            "fga_0.7.20_linux_arm64.tar.gz",
+            "fga_0.7.20_linux_386.tar.gz",
+            "fga_0.7.20_darwin_amd64.tar.gz",
+            "fga_0.7.20_darwin_arm64.tar.gz",
+            "fga_0.7.20_windows_amd64.tar.gz",
+            "fga_0.7.20_windows_arm64.tar.gz",
+            "fga_0.7.20_windows_386.tar.gz",
         ]
         for archive in expected_archives:
             assert archive in content, f"Missing archive: {archive}"
@@ -222,7 +222,7 @@ class TestFgaInstalled:
     def test_fga_version_output_contains_version(self):
         result = subprocess.run(["fga", "version"], capture_output=True, text=True)
         output = result.stdout + result.stderr
-        assert "0.7.19" in output, f"Version string not found in output: {output!r}"
+        assert "0.7.20" in output, f"Version string not found in output: {output!r}"
 
     def test_fga_help_exits_zero(self):
         result = subprocess.run(["fga", "help"], capture_output=True, text=True)
