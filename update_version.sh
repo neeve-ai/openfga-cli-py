@@ -39,14 +39,14 @@ get_sha() {
     echo "$CHECKSUMS" | grep "$1" | awk '{print $1}'
 }
 
-SHA_LINUX_AMD64=$(get_sha "fga_${VERSION}_linux_amd64.tar.gz")
-SHA_LINUX_ARM64=$(get_sha "fga_${VERSION}_linux_arm64.tar.gz")
-SHA_LINUX_386=$(get_sha "fga_${VERSION}_linux_386.tar.gz")
-SHA_DARWIN_AMD64=$(get_sha "fga_${VERSION}_darwin_amd64.tar.gz")
-SHA_DARWIN_ARM64=$(get_sha "fga_${VERSION}_darwin_arm64.tar.gz")
-SHA_WINDOWS_AMD64=$(get_sha "fga_${VERSION}_windows_amd64.tar.gz")
-SHA_WINDOWS_ARM64=$(get_sha "fga_${VERSION}_windows_arm64.tar.gz")
-SHA_WINDOWS_386=$(get_sha "fga_${VERSION}_windows_386.tar.gz")
+SHA_LINUX_AMD64=$(get_sha "fga_${VERSION}_linux_amd64.tar.gz$")
+SHA_LINUX_ARM64=$(get_sha "fga_${VERSION}_linux_arm64.tar.gz$")
+SHA_LINUX_386=$(get_sha "fga_${VERSION}_linux_386.tar.gz$")
+SHA_DARWIN_AMD64=$(get_sha "fga_${VERSION}_darwin_amd64.tar.gz$")
+SHA_DARWIN_ARM64=$(get_sha "fga_${VERSION}_darwin_arm64.tar.gz$")
+SHA_WINDOWS_AMD64=$(get_sha "fga_${VERSION}_windows_amd64.tar.gz$")
+SHA_WINDOWS_ARM64=$(get_sha "fga_${VERSION}_windows_arm64.tar.gz$")
+SHA_WINDOWS_386=$(get_sha "fga_${VERSION}_windows_386.tar.gz$")
 
 # Validate all checksums were found
 for var in SHA_LINUX_AMD64 SHA_LINUX_ARM64 SHA_LINUX_386 \
@@ -144,8 +144,8 @@ EOF
 echo "setup.cfg updated to version ${VERSION}.0"
 echo "Updated SHA-256 hashes for 8 platforms."
 
-# Update tests/test_openfga_cli.py
-TEST_FILE="${SCRIPT_DIR}/tests/test_openfga_cli.py"
+# Update tests/test_package.py
+TEST_FILE="${SCRIPT_DIR}/tests/test_package.py"
 OLD_VERSION_RE=${OLD_VERSION//./\\.}
 sed -i.bak \
     -e "s/version = ${OLD_VERSION_RE}/version = ${NEW_VERSION}/g" \
@@ -154,7 +154,7 @@ sed -i.bak \
     -e "s/v${OLD_VERSION_RE%\.0}'/v${VERSION}'/g" \
     "${TEST_FILE}"
 rm -f "${TEST_FILE}.bak"
-echo "tests/test_openfga_cli.py updated (${OLD_VERSION} → ${NEW_VERSION})"
+echo "tests/test_package.py updated (${OLD_VERSION} → ${NEW_VERSION})"
 
 # Update README.md
 README_FILE="${SCRIPT_DIR}/README.md"
