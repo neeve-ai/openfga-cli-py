@@ -14,7 +14,7 @@ pip install openfga-cli-py
 Or install a platform wheel directly from a GitHub Release (for air-gapped/offline use):
 
 ```bash
-pip install https://github.com/neeve-ai/openfga-cli-py/releases/download/v0.8.2.0/openfga_cli_py-0.8.2.0-py2.py3-none-linux_x86_64.whl
+pip install https://github.com/neeve-ai/openfga-cli-py/releases/download/v0.9.0.0/openfga_cli_py-0.9.0.0-py2.py3-none-linux_x86_64.whl
 ```
 
 ## Usage
@@ -54,7 +54,7 @@ Add to your `.pre-commit-config.yaml`:
 
 ```yaml
 - repo: https://github.com/neeve-ai/openfga-cli-py
-  rev: v0.8.2.0
+  rev: v0.9.0.0
   hooks:
     - id: fga
       args: [model, validate, --file, openfga.json]
